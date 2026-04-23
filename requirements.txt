@@ -1,0 +1,14 @@
+aiohttp
+feedparser
+beautifulsoup4
+lxml
+
+transformers
+torch
+nltk
+
+pandas
+numpy
+
+loguru
+python-dotenv
