@@ -4,7 +4,7 @@ import asyncio
 import aiohttp
 from src.model1_news.sources.google_news import fetch_google_news
 from src.model1_news.preprocessor import preprocess_news
-
+from src.model1_news.finbert_scorer import FinBERTScorer
 
 async def main():
     async with aiohttp.ClientSession() as session:
@@ -12,7 +12,7 @@ async def main():
         for n in news[:5]:
             print(n)
             for n in news[:5]:
-             print(n["published"])
+                print(n["published"])
         
         news = await fetch_google_news(session, "RELIANCE")
 
@@ -22,8 +22,17 @@ async def main():
         print(f"After: {len(filtered_news)}")
 
         for n in filtered_news:
-         print(n["published"], n["title"])
-  
+            print(n["published"], n["title"])
+        scorer = FinBERTScorer()
+
+        texts = [n["title"] for n in filtered_news]
+
+        results = scorer.score_batch(texts)
+
+        for t, r in zip(texts, results):
+            print(t)
+            print(r)
+            print("-" * 50)
 
 
 asyncio.run(main())
