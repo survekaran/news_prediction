@@ -2,7 +2,7 @@
 
 import asyncio
 from typing import List, Dict
-from datetime import datetime, time, timezone
+from datetime import datetime, time
 
 import aiohttp
 import sqlite3
@@ -13,6 +13,7 @@ from src.model1_news.sources.google_news import fetch_google_news
 from src.model1_news.preprocessor import preprocess_news
 from src.model1_news.finbert_scorer import FinBERTScorer
 from src.model1_news.aggregator import aggregate_news
+from src.utils.watchlist_loader import load_watchlist
 
 
 # ==============================
@@ -81,7 +82,7 @@ last_states: Dict[str, Dict] = {}
 
 
 # ==============================
-# SINGLE CYCLE
+# SINGLE STOCK PROCESSING
 # ==============================
 
 async def process_stock(session, symbol, scorer):
@@ -117,6 +118,10 @@ async def process_stock(session, symbol, scorer):
         return None
 
 
+# ==============================
+# SINGLE CYCLE (ALL STOCKS)
+# ==============================
+
 async def run_cycle(symbols: List[str], scorer: FinBERTScorer):
     """
     Run one 3-minute cycle for all stocks
@@ -136,7 +141,7 @@ async def run_cycle(symbols: List[str], scorer: FinBERTScorer):
 # MAIN LOOP
 # ==============================
 
-async def run_intraday(symbols: List[str]):
+async def run_intraday():
     """
     Main loop running every 3 minutes during market hours
     """
@@ -148,10 +153,18 @@ async def run_intraday(symbols: List[str]):
     scorer = FinBERTScorer()
 
     while True:
+        # 🔥 ALWAYS reload watchlist (dynamic system)
+        symbols = load_watchlist()
+
+        if not symbols:
+            logger.warning("⚠️ Watchlist is empty. Skipping cycle...")
+            await asyncio.sleep(60)
+            continue
+
         now = datetime.now().time()
 
         if MARKET_START <= now <= MARKET_END:
-            logger.info("⏱ Running 3-minute cycle...")
+            logger.info(f"⏱ Running cycle for: {symbols}")
 
             results = await run_cycle(symbols, scorer)
 
@@ -170,6 +183,4 @@ async def run_intraday(symbols: List[str]):
 # ==============================
 
 if __name__ == "__main__":
-    symbols = ["RELIANCE", "TCS", "INFY", "HDFCBANK", "ICICIBANK"]
-
-    asyncio.run(run_intraday(symbols))
+    asyncio.run(run_intraday())
