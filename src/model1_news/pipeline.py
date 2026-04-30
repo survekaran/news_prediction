@@ -9,7 +9,12 @@ import sqlite3
 
 from loguru import logger
 
+# 🔥 Sources
 from src.model1_news.sources.google_news import fetch_google_news
+from src.model1_news.sources.et_news import fetch_et_news
+from src.model1_news.sources.moneycontrol import fetch_moneycontrol_news
+
+# 🔥 Core modules
 from src.model1_news.preprocessor import preprocess_news
 from src.model1_news.finbert_scorer import FinBERTScorer
 from src.model1_news.aggregator import aggregate_news
@@ -90,12 +95,31 @@ async def process_stock(session, symbol, scorer):
     Process one stock: fetch → preprocess → score → aggregate
     """
     try:
-        raw_news = await fetch_google_news(session, symbol)
+        # 🔥 PARALLEL FETCH (IMPORTANT CHANGE)
+        google_task = fetch_google_news(session, symbol)
+        et_task = fetch_et_news(session, symbol)
+        mc_task = fetch_moneycontrol_news(session, symbol)
 
+        google_news, et_news, mc_news = await asyncio.gather(
+            google_task,
+            et_task,
+            mc_task,
+            return_exceptions=True
+        )
+
+        # 🔥 SAFE MERGE (IMPORTANT CHANGE)
+        raw_news = []
+
+        for source_data in [google_news, et_news, mc_news]:
+            if isinstance(source_data, Exception):
+                logger.warning(f"[Pipeline] Source failed: {source_data}")
+                continue
+            raw_news.extend(source_data)
+
+        # 🔥 CONTINUE PIPELINE
         processed_news = preprocess_news(raw_news)
 
         texts = [n["title"] for n in processed_news]
-
         sentiments = scorer.score_batch(texts)
 
         result = aggregate_news(
@@ -105,10 +129,8 @@ async def process_stock(session, symbol, scorer):
             last_state=last_states.get(symbol)
         )
 
-        # Update memory
+        # 🔥 MEMORY + DB
         last_states[symbol] = result
-
-        # Save to DB
         save_to_db(result)
 
         return result
@@ -119,13 +141,10 @@ async def process_stock(session, symbol, scorer):
 
 
 # ==============================
-# SINGLE CYCLE (ALL STOCKS)
+# SINGLE CYCLE
 # ==============================
 
 async def run_cycle(symbols: List[str], scorer: FinBERTScorer):
-    """
-    Run one 3-minute cycle for all stocks
-    """
     async with aiohttp.ClientSession() as session:
         tasks = [
             process_stock(session, symbol, scorer)
@@ -142,22 +161,16 @@ async def run_cycle(symbols: List[str], scorer: FinBERTScorer):
 # ==============================
 
 async def run_intraday():
-    """
-    Main loop running every 3 minutes during market hours
-    """
-
     logger.info("🚀 Starting Model 1 News Pipeline")
 
     init_db()
-
     scorer = FinBERTScorer()
 
     while True:
-        # 🔥 ALWAYS reload watchlist (dynamic system)
         symbols = load_watchlist()
 
         if not symbols:
-            logger.warning("⚠️ Watchlist is empty. Skipping cycle...")
+            logger.warning("⚠️ Watchlist empty")
             await asyncio.sleep(60)
             continue
 
@@ -171,10 +184,10 @@ async def run_intraday():
             for r in results:
                 logger.info(f"📊 {r}")
 
-            await asyncio.sleep(180)  # 3 minutes
+            await asyncio.sleep(180)
 
         else:
-            logger.info("⏸ Market closed. Waiting...")
+            logger.info("⏸ Market closed")
             await asyncio.sleep(60)
 
 

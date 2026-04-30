@@ -4,8 +4,9 @@ from typing import List, Dict, Optional
 from datetime import datetime, timezone
 import math
 from loguru import logger
+import dateutil.parser  # 🔥 IMPORTANT FIX
 
-# Source weights (can later move to config.py)
+
 SOURCE_WEIGHTS = {
     "google": 0.6,
     "et": 0.8,
@@ -15,14 +16,9 @@ SOURCE_WEIGHTS = {
 
 
 def compute_recency_weight(published_time: datetime) -> float:
-    """
-    Newer news gets higher weight.
-    """
     now = datetime.now(timezone.utc)
     minutes_old = (now - published_time).total_seconds() / 60
-
-    # Exponential decay (tunable)
-    return math.exp(-minutes_old / 60)  # 1-hour decay
+    return math.exp(-minutes_old / 60)
 
 
 def aggregate_news(
@@ -31,12 +27,13 @@ def aggregate_news(
     sentiment_list: List[Dict],
     last_state: Optional[Dict] = None
 ) -> Dict:
-    """
-    Aggregate sentiment scores into a single stock-level signal.
-    """
+
+    # ==============================
+    # NO NEWS → CARRY FORWARD
+    # ==============================
 
     if not news_list or not sentiment_list:
-        logger.warning(f"[Aggregator] No news for {symbol}, using carry-forward")
+        logger.warning(f"[Aggregator] No news for {symbol}")
 
         if last_state:
             return {
@@ -65,14 +62,16 @@ def aggregate_news(
     top_headline = None
     max_abs_score = 0
 
+    # ==============================
+    # MAIN LOOP
+    # ==============================
+
     for news, sentiment in zip(news_list, sentiment_list):
         try:
             score = sentiment["score"]
 
-            # Parse published time
-            published_time = datetime.fromisoformat(
-                news["published"].replace("Z", "+00:00")
-            )
+            # 🔥 FIXED DATE PARSING
+            published_time = dateutil.parser.parse(news["published"])
 
             recency_weight = compute_recency_weight(published_time)
             source_weight = SOURCE_WEIGHTS.get(news["source"], 0.5)
@@ -82,18 +81,22 @@ def aggregate_news(
             weighted_scores.append(score * final_weight)
             weights.append(final_weight)
 
-            # Track sources
+            # track sources
             source = news["source"]
             source_count[source] = source_count.get(source, 0) + 1
 
-            # Track strongest headline
+            # strongest headline
             if abs(score) > max_abs_score:
                 max_abs_score = abs(score)
                 top_headline = news["title"]
 
         except Exception as e:
-            logger.warning(f"[Aggregator] Skipping malformed entry: {e}")
+            logger.warning(f"[Aggregator] Skipping entry: {e}")
             continue
+
+    # ==============================
+    # EDGE CASE
+    # ==============================
 
     if not weights:
         logger.warning(f"[Aggregator] No valid weights for {symbol}")
@@ -108,10 +111,12 @@ def aggregate_news(
             "source_breakdown": {}
         }
 
-    # Final weighted score
+    # ==============================
+    # FINAL SCORE
+    # ==============================
+
     news_score = sum(weighted_scores) / sum(weights)
 
-    # Direction
     if news_score > 0.2:
         direction = "bullish"
     elif news_score < -0.2:
@@ -119,12 +124,8 @@ def aggregate_news(
     else:
         direction = "neutral"
 
-    # Confidence calculation
     headline_count = len(weights)
-    confidence = min(
-        1.0,
-        abs(news_score) + 0.2 * math.log(1 + headline_count)
-    )
+    confidence = min(1.0, abs(news_score) + 0.2 * math.log(1 + headline_count))
 
     result = {
         "symbol": symbol,

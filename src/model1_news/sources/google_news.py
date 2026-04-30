@@ -1,10 +1,19 @@
 # src/model1_news/sources/google_news.py
 
 from typing import List, Dict
-import asyncio
 import aiohttp
 import feedparser
+import asyncio
 from loguru import logger
+
+# 🔥 Add company mapping (important for better search)
+STOCK_METADATA = {
+    "RELIANCE": "Reliance Industries",
+    "TCS": "Tata Consultancy Services",
+    "INFY": "Infosys",
+    "HDFCBANK": "HDFC Bank",
+    "ICICIBANK": "ICICI Bank"
+}
 
 GOOGLE_RSS_URL = (
     "https://news.google.com/rss/search?q={query}&hl=en-IN&gl=IN&ceid=IN:en"
@@ -14,21 +23,13 @@ GOOGLE_RSS_URL = (
 async def fetch_google_news(
     session: aiohttp.ClientSession,
     symbol: str,
-    max_items: int = 20
+    max_items: int = 50  # 🔥 increased from 20 → 50
 ) -> List[Dict]:
-    """
-    Fetch news articles for a given stock symbol from Google News RSS.
 
-    Args:
-        session (aiohttp.ClientSession): Shared async HTTP session
-        symbol (str): Stock symbol (e.g., RELIANCE, TCS)
-        max_items (int): Max number of articles to return
+    company_name = STOCK_METADATA.get(symbol, symbol)
 
-    Returns:
-        List[Dict]: List of news articles with structured fields
-    """
-
-    query = f"{symbol} NSE stock"
+    # 🔥 improved query
+    query = f'"{company_name}" OR {symbol} stock India'
     url = GOOGLE_RSS_URL.format(query=query.replace(" ", "+"))
 
     try:
@@ -61,7 +62,6 @@ async def fetch_google_news(
                 "source": "google"
             }
 
-            # Basic validation
             if article["title"] and article["link"]:
                 articles.append(article)
 
