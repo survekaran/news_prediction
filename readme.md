@@ -55,7 +55,7 @@ python -m src.model1_news.pipeline
 
 ---
 
-# 🧾 WATCHLIST (VERY IMPORTANT)
+# 🧾 WATCHLIST (VERY IMPORTANT):
 
 File location:
 
