@@ -13,6 +13,7 @@ from loguru import logger
 from src.model1_news.sources.google_news import fetch_google_news
 from src.model1_news.sources.et_news import fetch_et_news
 from src.model1_news.sources.moneycontrol import fetch_moneycontrol_news
+from src.model1_news.sources.rss_sources import fetch_all_rss
 
 # 🔥 Core modules
 from src.model1_news.preprocessor import preprocess_news
@@ -96,21 +97,19 @@ async def process_stock(session, symbol, scorer):
     """
     try:
         # 🔥 PARALLEL FETCH (IMPORTANT CHANGE)
+        # 🔥 Multi-source fetch
         google_task = fetch_google_news(session, symbol)
-        et_task = fetch_et_news(session, symbol)
-        mc_task = fetch_moneycontrol_news(session, symbol)
+        rss_task = fetch_all_rss(session, symbol)
 
-        google_news, et_news, mc_news = await asyncio.gather(
+        google_news, rss_news = await asyncio.gather(
             google_task,
-            et_task,
-            mc_task,
+            rss_task,
             return_exceptions=True
         )
 
-        # 🔥 SAFE MERGE (IMPORTANT CHANGE)
         raw_news = []
 
-        for source_data in [google_news, et_news, mc_news]:
+        for source_data in [google_news, rss_news]:
             if isinstance(source_data, Exception):
                 logger.warning(f"[Pipeline] Source failed: {source_data}")
                 continue
