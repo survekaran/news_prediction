@@ -1,4 +1,4 @@
-# 🧠 Model 1 — News Sentiment Engine
+ 🧠 Model 1 — News Sentiment Engine
 
 This module is part of a **Stock Prediction System**.
 
