@@ -14,6 +14,8 @@ from src.model1_news.sources.google_news import fetch_google_news
 from src.model1_news.sources.et_news import fetch_et_news
 from src.model1_news.sources.moneycontrol import fetch_moneycontrol_news
 from src.model1_news.sources.rss_sources import fetch_all_rss
+from src.model1_news.sources.nse_announcements import fetch_nse_announcements
+from src.model1_news.sources.bse_announcements import fetch_bse_announcements
 
 # 🔥 Core modules
 from src.model1_news.preprocessor import preprocess_news
@@ -96,27 +98,40 @@ async def process_stock(session, symbol, scorer):
     Process one stock: fetch → preprocess → score → aggregate
     """
     try:
-        # 🔥 PARALLEL FETCH (IMPORTANT CHANGE)
-        # 🔥 Multi-source fetch
+        # 🔥 PARALLEL FETCH
         google_task = fetch_google_news(session, symbol)
         rss_task = fetch_all_rss(session, symbol)
 
-        google_news, rss_news = await asyncio.gather(
+        # 🔥 BLOCKING SOURCES → THREAD
+        nse_task = asyncio.to_thread(fetch_nse_announcements, symbol)
+        bse_task = asyncio.to_thread(fetch_bse_announcements, symbol)
+
+        google_news, rss_news, nse_news, bse_news = await asyncio.gather(
             google_task,
             rss_task,
+            nse_task,
+            bse_task,
             return_exceptions=True
         )
 
         raw_news = []
 
-        for source_data in [google_news, rss_news]:
+        for source_data in [google_news, rss_news, nse_news, bse_news]:
             if isinstance(source_data, Exception):
                 logger.warning(f"[Pipeline] Source failed: {source_data}")
                 continue
-            raw_news.extend(source_data)
 
-        # 🔥 CONTINUE PIPELINE
+            if source_data:
+                raw_news.extend(source_data)
+
+        # ==============================
+        # PIPELINE
+        # ==============================
+
         processed_news = preprocess_news(raw_news)
+
+        if not processed_news:
+            logger.warning(f"[Pipeline] No processed news for {symbol}")
 
         texts = [n["title"] for n in processed_news]
         sentiments = scorer.score_batch(texts)
@@ -128,7 +143,10 @@ async def process_stock(session, symbol, scorer):
             last_state=last_states.get(symbol)
         )
 
-        # 🔥 MEMORY + DB
+        # ==============================
+        # STORE
+        # ==============================
+
         last_states[symbol] = result
         save_to_db(result)
 

@@ -11,7 +11,8 @@ SOURCE_WEIGHTS = {
     "google": 0.6,
     "et": 0.8,
     "moneycontrol": 0.7,
-    "nse": 1.0
+    "nse": 1.0,
+    "bse": 0.95   # 👈 ADD THIS
 }
 
 
