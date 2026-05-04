@@ -129,7 +129,7 @@ async def process_stock(session, symbol, scorer):
         if not processed_news:
             logger.warning(f"[Pipeline] No processed news for {symbol}")
 
-        texts = [n["title"] for n in processed_news]
+        texts = [n.get("analysis_text") or n["title"] for n in processed_news]
         sentiments = scorer.score_batch(texts)
 
         result = aggregate_news(

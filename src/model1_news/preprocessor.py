@@ -68,14 +68,14 @@ def is_recent(published_str: str) -> bool:
 # RELEVANCE LOGIC
 # ==============================
 
-def is_relevant(title: str, symbol: str, source: str) -> bool:
+def is_relevant(title: str, summary: str, symbol: str, source: str) -> bool:
     """
     Different logic for:
     - News sources (Google, RSS)
     - NSE/BSE announcements
     """
 
-    title = title.lower()
+    combined_text = f"{title} {summary}".lower()
 
     # 🔥 NSE/BSE → ALWAYS RELEVANT (already filtered upstream)
     if source in ["nse", "bse"]:
@@ -85,8 +85,8 @@ def is_relevant(title: str, symbol: str, source: str) -> bool:
     company_name = STOCK_METADATA.get(symbol, symbol)
 
     return (
-        symbol.lower() in title or
-        company_name.lower() in title
+        symbol.lower() in combined_text or
+        company_name.lower() in combined_text
     )
 
 
@@ -107,6 +107,7 @@ def preprocess_news(news_list: List[Dict]) -> List[Dict]:
 
     for news in news_list:
         title = clean_text(news.get("title", ""))
+        summary = clean_text(news.get("summary", ""))
 
         if not title:
             continue
@@ -115,11 +116,13 @@ def preprocess_news(news_list: List[Dict]) -> List[Dict]:
 
         if (
             is_recent(news.get("published", "")) and
-            is_relevant(title, news["symbol"], source)
+            is_relevant(title, summary, news["symbol"], source)
         ):
             strict_results.append({
                 **news,
-                "title": title
+                "title": title,
+                "summary": summary,
+                "analysis_text": clean_text(f"{title}. {summary}") if summary else title
             })
 
     # ==============================
@@ -140,6 +143,7 @@ def preprocess_news(news_list: List[Dict]) -> List[Dict]:
 
     for news in news_list:
         title = clean_text(news.get("title", ""))
+        summary = clean_text(news.get("summary", ""))
 
         if not title:
             continue
@@ -147,7 +151,9 @@ def preprocess_news(news_list: List[Dict]) -> List[Dict]:
         if is_recent(news.get("published", "")):
             relaxed_results.append({
                 **news,
-                "title": title
+                "title": title,
+                "summary": summary,
+                "analysis_text": clean_text(f"{title}. {summary}") if summary else title
             })
 
     logger.info(f"[Preprocessor] Relaxed → {len(relaxed_results)} articles")

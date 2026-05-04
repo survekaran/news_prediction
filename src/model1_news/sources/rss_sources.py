@@ -15,6 +15,18 @@ RSS_SOURCES = {
     "reuters": "https://feeds.reuters.com/reuters/INbusinessNews",
 }
 
+STOCK_METADATA = {
+    "RELIANCE": "Reliance Industries",
+    "TCS": "Tata Consultancy Services",
+    "INFY": "Infosys",
+    "HDFCBANK": "HDFC Bank",
+    "ICICIBANK": "ICICI Bank",
+    "ITC": "ITC",
+    "NTPC": "NTPC",
+    "COALINDIA": "Coal India",
+    "INDUSINDBK": "IndusInd Bank"
+}
+
 
 async def fetch_rss_source(session, url: str, source_name: str, symbol: str, max_items: int = 30) -> List[Dict]:
     """
@@ -39,22 +51,26 @@ async def fetch_rss_source(session, url: str, source_name: str, symbol: str, max
 
     try:
         feed = feedparser.parse(xml_text)
+        company_name = STOCK_METADATA.get(symbol, symbol)
 
         articles: List[Dict] = []
 
         for entry in feed.entries[:max_items]:
             title = entry.get("title", "").strip()
+            summary = entry.get("summary", "").strip()
 
             if not title:
                 continue
 
-            # 🔥 LIGHT relevance (NOT strict)
-            if symbol.lower() not in title.lower():
+            # 🔥 LIGHT relevance (title + summary)
+            combined_text = f"{title} {summary}".lower()
+            if symbol.lower() not in combined_text and company_name.lower() not in combined_text:
                 continue
 
             article = {
                 "symbol": symbol,
                 "title": title,
+                "summary": summary,
                 "link": entry.get("link", "").strip(),
                 "published": entry.get("published", ""),
                 "source": source_name
