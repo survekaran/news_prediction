@@ -9,15 +9,13 @@ import sqlite3
 
 from loguru import logger
 
-# 🔥 Sources
+# Sources
 from src.model1_news.sources.google_news import fetch_google_news
-from src.model1_news.sources.et_news import fetch_et_news
-from src.model1_news.sources.moneycontrol import fetch_moneycontrol_news
 from src.model1_news.sources.rss_sources import fetch_all_rss
 from src.model1_news.sources.nse_announcements import fetch_nse_announcements
 from src.model1_news.sources.bse_announcements import fetch_bse_announcements
 
-# 🔥 Core modules
+# Core
 from src.model1_news.preprocessor import preprocess_news
 from src.model1_news.finbert_scorer import FinBERTScorer
 from src.model1_news.aggregator import aggregate_news
@@ -83,26 +81,22 @@ def save_to_db(result: Dict):
 
 
 # ==============================
-# MEMORY (carry-forward)
+# MEMORY
 # ==============================
 
 last_states: Dict[str, Dict] = {}
 
 
 # ==============================
-# SINGLE STOCK PROCESSING
+# PROCESS SINGLE STOCK
 # ==============================
 
 async def process_stock(session, symbol, scorer):
-    """
-    Process one stock: fetch → preprocess → score → aggregate
-    """
     try:
         # 🔥 PARALLEL FETCH
         google_task = fetch_google_news(session, symbol)
         rss_task = fetch_all_rss(session, symbol)
 
-        # 🔥 BLOCKING SOURCES → THREAD
         nse_task = asyncio.to_thread(fetch_nse_announcements, symbol)
         bse_task = asyncio.to_thread(fetch_bse_announcements, symbol)
 
@@ -124,8 +118,10 @@ async def process_stock(session, symbol, scorer):
             if source_data:
                 raw_news.extend(source_data)
 
+        logger.info(f"[DEBUG] {symbol} → Raw News: {len(raw_news)}")
+
         # ==============================
-        # PIPELINE
+        # PROCESS
         # ==============================
 
         processed_news = preprocess_news(raw_news)
@@ -143,10 +139,7 @@ async def process_stock(session, symbol, scorer):
             last_state=last_states.get(symbol)
         )
 
-        # ==============================
-        # STORE
-        # ==============================
-
+        # SAVE
         last_states[symbol] = result
         save_to_db(result)
 
@@ -158,7 +151,7 @@ async def process_stock(session, symbol, scorer):
 
 
 # ==============================
-# SINGLE CYCLE
+# RUN ONE CYCLE
 # ==============================
 
 async def run_cycle(symbols: List[str], scorer: FinBERTScorer):
@@ -184,7 +177,10 @@ async def run_intraday():
     scorer = FinBERTScorer()
 
     while True:
-        symbols = load_watchlist()
+        # ✅ LOAD WATCHLIST ONLY ONCE
+        watchlist = load_watchlist()
+
+        symbols = [stock["symbol"] for stock in watchlist if isinstance(stock, dict)]
 
         if not symbols:
             logger.warning("⚠️ Watchlist empty")
@@ -209,7 +205,7 @@ async def run_intraday():
 
 
 # ==============================
-# ENTRY POINT
+# ENTRY
 # ==============================
 
 if __name__ == "__main__":

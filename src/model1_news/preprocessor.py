@@ -7,26 +7,37 @@ import re
 from loguru import logger
 
 
-# 🔥 Add company mapping (same as google_news.py)
+# ==============================
+# STOCK METADATA
+# ==============================
+
 STOCK_METADATA = {
     "RELIANCE": "Reliance Industries",
     "TCS": "Tata Consultancy Services",
     "INFY": "Infosys",
     "HDFCBANK": "HDFC Bank",
-    "ICICIBANK": "ICICI Bank"
+    "ICICIBANK": "ICICI Bank",
+    "ITC": "ITC",
+    "NTPC": "NTPC",
+    "COALINDIA": "Coal India",
+    "INDUSINDBK": "IndusInd Bank"
 }
 
 
+# ==============================
+# CLEANING
+# ==============================
+
 def clean_text(text: str) -> str:
-    """
-    Basic text cleaning for headlines
-    """
     text = text.strip()
     text = re.sub(r"\s+", " ", text)
     return text
 
 
-# 🔥 Dynamic time window
+# ==============================
+# TIME WINDOW
+# ==============================
+
 def get_dynamic_window() -> int:
     now = datetime.now().time()
 
@@ -37,18 +48,13 @@ def get_dynamic_window() -> int:
 
 
 def is_recent(published_str: str) -> bool:
-    """
-    Check if news is within allowed time window (dynamic)
-    """
     try:
         published_time = dateutil.parser.parse(published_str)
 
-        # Ensure timezone-aware
         if published_time.tzinfo is None:
             published_time = published_time.replace(tzinfo=timezone.utc)
 
         now = datetime.now(timezone.utc)
-
         max_age_minutes = get_dynamic_window()
 
         return (now - published_time) <= timedelta(minutes=max_age_minutes)
@@ -58,17 +64,35 @@ def is_recent(published_str: str) -> bool:
         return False
 
 
-# 🔥 Strict relevance check
-def is_relevant(title: str, symbol: str) -> bool:
-    company_name = STOCK_METADATA.get(symbol, symbol)
+# ==============================
+# RELEVANCE LOGIC
+# ==============================
+
+def is_relevant(title: str, symbol: str, source: str) -> bool:
+    """
+    Different logic for:
+    - News sources (Google, RSS)
+    - NSE/BSE announcements
+    """
 
     title = title.lower()
+
+    # 🔥 NSE/BSE → ALWAYS RELEVANT (already filtered upstream)
+    if source in ["nse", "bse"]:
+        return True
+
+    # 🔥 News sources → strict match
+    company_name = STOCK_METADATA.get(symbol, symbol)
 
     return (
         symbol.lower() in title or
         company_name.lower() in title
     )
 
+
+# ==============================
+# MAIN PREPROCESS FUNCTION
+# ==============================
 
 def preprocess_news(news_list: List[Dict]) -> List[Dict]:
     """
@@ -87,18 +111,29 @@ def preprocess_news(news_list: List[Dict]) -> List[Dict]:
         if not title:
             continue
 
-        if is_recent(news.get("published", "")) and is_relevant(title, news["symbol"]):
+        source = news.get("source", "").lower()
+
+        if (
+            is_recent(news.get("published", "")) and
+            is_relevant(title, news["symbol"], source)
+        ):
             strict_results.append({
                 **news,
                 "title": title
             })
 
-    # ✅ If strict gives results → return
+    # ==============================
+    # STRICT SUCCESS
+    # ==============================
+
     if strict_results:
         logger.info(f"[Preprocessor] Strict → {len(strict_results)} articles")
         return strict_results
 
-    # 🔥 Fallback mode
+    # ==============================
+    # FALLBACK MODE
+    # ==============================
+
     logger.warning("[Preprocessor] No strict matches → using relaxed filter")
 
     relaxed_results = []

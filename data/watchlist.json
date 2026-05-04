@@ -1,4 +1,27 @@
-{
-    "date": "2026-04-30",
-    "stocks": ["RELIANCE", "COAL INDIA", "ITC", "NTPC", "INDUSLND BANK"]
+[
+  {
+    "symbol": "RELIANCE",
+    "nse_symbol": "RELIANCE",
+    "bse_code": 500325
+  },
+  {
+    "symbol": "ITC",
+    "nse_symbol": "ITC",
+    "bse_code": 500875
+  },
+  {
+    "symbol": "NTPC",
+    "nse_symbol": "NTPC",
+    "bse_code": 532555
+  },
+  {
+    "symbol": "COALINDIA",
+    "nse_symbol": "COALINDIA",
+    "bse_code": 533278
+  },
+  {
+    "symbol": "INDUSINDBK",
+    "nse_symbol": "INDUSINDBK",
+    "bse_code": 532187
   }
+]

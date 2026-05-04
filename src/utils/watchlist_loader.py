@@ -6,19 +6,29 @@ from loguru import logger
 
 def load_watchlist(path: str = "data/watchlist.json"):
     """
-    Load stock symbols from watchlist JSON file
+    Supports BOTH formats:
+    1. List of dicts
+    2. {"stocks": [...]}
     """
 
     try:
         with open(path, "r") as f:
             data = json.load(f)
 
-        stocks = data.get("stocks", [])
+        # ✅ HANDLE BOTH FORMATS
+        if isinstance(data, list):
+            stocks = data
+        elif isinstance(data, dict):
+            stocks = data.get("stocks", [])
+        else:
+            logger.error("[Watchlist] Invalid format")
+            return []
 
         if not stocks:
             logger.warning("[Watchlist] Empty stock list")
 
-        logger.info(f"[Watchlist] Loaded stocks: {stocks}")
+        symbols = [s.get("symbol") for s in stocks if isinstance(s, dict)]
+        logger.info(f"[Watchlist] Loaded stocks: {symbols}")
 
         return stocks
 
