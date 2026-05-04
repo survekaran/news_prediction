@@ -57,6 +57,7 @@ async def fetch_google_news(
             article = {
                 "symbol": symbol,
                 "title": entry.get("title", "").strip(),
+                "summary": entry.get("summary", "").strip(),
                 "link": entry.get("link", "").strip(),
                 "published": entry.get("published", ""),
                 "source": "google"
