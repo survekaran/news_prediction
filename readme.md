@@ -17,8 +17,7 @@ Every **3 minutes during market hours**, this system:
 - Filters relevant & recent data
 - Uses AI (FinBERT) to analyze sentiment
 - Aggregates everything into **one final score per stock**
-- Stores results in a database
-
+- Stores results in a database.
 ---
 
 # 🧠 WHY THIS IS IMPORTANT
