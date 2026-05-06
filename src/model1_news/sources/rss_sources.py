@@ -12,7 +12,7 @@ RSS_SOURCES = {
     "moneycontrol": "https://www.moneycontrol.com/rss/business.xml",
     "business_standard": "https://www.business-standard.com/rss/markets-106.rss",
     "mint": "https://www.livemint.com/rss/markets",
-    "reuters": "https://feeds.reuters.com/reuters/INbusinessNews",
+    # "reuters": "https://feeds.reuters.com/reuters/INbusinessNews",  -- Can't fetch the news from this source, it blocks the request (403 Forbidden)
 }
 
 STOCK_METADATA = {
@@ -46,7 +46,7 @@ async def fetch_rss_source(session, url: str, source_name: str, symbol: str, max
         return []
 
     except Exception as e:
-        logger.exception(f"[{source_name}] Fetch error: {e}")
+        logger.warning(f"[{source_name}] Fetch error: {e}")
         return []
 
     try:
